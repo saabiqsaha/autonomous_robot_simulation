@@ -122,8 +122,8 @@ class Warehouse:
                 x = np.random.uniform(0, self.width)
                 y = np.random.uniform(0, self.length)
                 
-                # Check if position is free
-                if not self._is_position_occupied((x, y)):
+                # Check if position is free, passing the current obstacles list to avoid circular dependency
+                if not self._is_position_occupied((x, y), existing_obstacles=obstacles):
                     # Random obstacle properties
                     width = np.random.uniform(0.3, 1.0)
                     length = np.random.uniform(0.3, 1.0)
@@ -225,7 +225,7 @@ class Warehouse:
             
         return charging_stations
         
-    def _is_position_occupied(self, position):
+    def _is_position_occupied(self, position, existing_obstacles=None):
         """Check if a position is occupied by an obstacle or rack."""
         x, y = position
         
@@ -237,8 +237,9 @@ class Warehouse:
             if self.layout[layout_y, layout_x] == 1:
                 return True
                 
-        # Check obstacles
-        for obstacle in self.obstacles:
+        # Check obstacles - use either provided list or self.obstacles
+        obstacles_to_check = existing_obstacles if existing_obstacles is not None else self.obstacles
+        for obstacle in obstacles_to_check:
             if obstacle.is_point_inside(position):
                 return True
                 
