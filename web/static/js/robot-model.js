@@ -56,12 +56,23 @@ function createRobotModel() {
     robot.model = new THREE.Group();
     robot.model.name = 'robot';
     
+    // Use shared geometry if available for better performance
+    let bodyGeometry;
+    if (typeof getSharedBoxGeometry === 'function') {
+        bodyGeometry = getSharedBoxGeometry(
+            robot.dimensions.width, 
+            robot.dimensions.height, 
+            robot.dimensions.length
+        );
+    } else {
+        bodyGeometry = new THREE.BoxGeometry(
+            robot.dimensions.width, 
+            robot.dimensions.height, 
+            robot.dimensions.length
+        );
+    }
+    
     // Robot body
-    const bodyGeometry = new THREE.BoxGeometry(
-        robot.dimensions.width, 
-        robot.dimensions.height, 
-        robot.dimensions.length
-    );
     const body = new THREE.Mesh(bodyGeometry, robotMaterials.body);
     // Position the body so its bottom is at y=0
     body.position.y = robot.dimensions.height / 2;
@@ -72,8 +83,16 @@ function createRobotModel() {
     // Add wheels (4 cylinders)
     const wheelRadius = 0.1;
     const wheelThickness = 0.05;
-    const wheelGeometry = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelThickness, 16);
-    wheelGeometry.rotateX(Math.PI / 2); // Rotate to align with the robot's movement
+    
+    // Use shared geometry if available
+    let wheelGeometry;
+    if (typeof getSharedCylinderGeometry === 'function') {
+        wheelGeometry = getSharedCylinderGeometry(wheelRadius, wheelThickness, 8);
+        wheelGeometry.rotateX(Math.PI / 2); // Rotate to align with the robot's movement
+    } else {
+        wheelGeometry = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelThickness, 8);
+        wheelGeometry.rotateX(Math.PI / 2); // Rotate to align with the robot's movement
+    }
     
     // Calculate wheel positions
     const wheelOffsetX = robot.dimensions.width / 2 - wheelRadius;
@@ -96,7 +115,22 @@ function createRobotModel() {
     
     // Add a sensor array (small dome on top)
     const sensorRadius = 0.15;
-    const sensorGeometry = new THREE.SphereGeometry(sensorRadius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+    
+    // Use shared geometry if available
+    let sensorGeometry;
+    if (typeof getSharedSphereGeometry === 'function') {
+        sensorGeometry = getSharedSphereGeometry(sensorRadius, 8);
+        // Convert to half sphere
+        for (let i = 0; i < sensorGeometry.attributes.position.count; i++) {
+            if (sensorGeometry.attributes.position.getY(i) < 0) {
+                sensorGeometry.attributes.position.setY(i, 0);
+            }
+        }
+        sensorGeometry.computeVertexNormals();
+    } else {
+        sensorGeometry = new THREE.SphereGeometry(sensorRadius, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2);
+    }
+    
     const sensor = new THREE.Mesh(sensorGeometry, robotMaterials.sensors);
     sensor.position.set(0, robot.dimensions.height + sensorRadius / 2, 0);
     sensor.castShadow = true;
@@ -303,4 +337,86 @@ function updateRobotUI() {
         const degrees = (robot.orientation * 180 / Math.PI) % 360;
         orientationElement.textContent = `Orientation: ${degrees.toFixed(1)}°`;
     }
+}
+
+/**
+ * Apply level-of-detail (LOD) to the robot model based on camera distance
+ * @param {THREE.Camera} camera - The camera to use for distance check
+ */
+function applyRobotLOD(camera) {
+    if (!robot.model || !camera) return;
+    
+    // Calculate distance from camera to robot
+    const cameraPosition = camera.position;
+    const robotPosition = new THREE.Vector3(robot.position[0], 0, robot.position[1]);
+    const distance = cameraPosition.distanceTo(robotPosition);
+    
+    // Define distance thresholds for LOD
+    const NEAR_DISTANCE = 10;
+    const FAR_DISTANCE = 30;
+    
+    // Apply LOD based on distance
+    if (distance > FAR_DISTANCE) {
+        // Far - simplify rendering
+        robot.model.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = false;
+                child.receiveShadow = false;
+            }
+        });
+    } else if (distance > NEAR_DISTANCE) {
+        // Medium - only main body casts shadows
+        robot.model.traverse(child => {
+            if (child.isMesh) {
+                // Only the body casts shadows at medium distance
+                child.castShadow = child.name === 'body';
+                child.receiveShadow = true;
+            }
+        });
+    } else {
+        // Near - full detail
+        robot.model.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+    }
+}
+
+/**
+ * Clean up robot model resources
+ */
+function disposeRobotModel() {
+    if (!robot.model) return;
+    
+    // Remove from scene
+    scene.remove(robot.model);
+    
+    // Dispose geometries and materials
+    robot.model.traverse(child => {
+        if (child.isMesh) {
+            if (child.geometry && !child.geometry.isSharedGeometry) {
+                child.geometry.dispose();
+            }
+            if (child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(material => material.dispose());
+                } else {
+                    child.material.dispose();
+                }
+            }
+        }
+    });
+    
+    // Remove path line
+    if (robot.pathLine) {
+        scene.remove(robot.pathLine);
+        if (robot.pathLine.geometry) robot.pathLine.geometry.dispose();
+        if (robot.pathLine.material) robot.pathLine.material.dispose();
+        robot.pathLine = null;
+    }
+    
+    robot.model = null;
+    console.log('Robot model disposed');
 }

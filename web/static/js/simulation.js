@@ -18,6 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Three.js environment
     initThreeJS();
     
+    // Initialize performance monitor
+    initPerformanceMonitor();
+    
+    // Setup performance options
+    setupPerformanceOptions();
+    
     // Connect to the server
     connectToServer();
     
@@ -138,6 +144,10 @@ function initializeSimulation(data) {
     
     // Start simulation
     simulationState.isRunning = true;
+    
+    // The loading overlay will be automatically hidden by the performance monitor
+    // when all steps are completed
+}
 }
 
 /**
@@ -150,6 +160,11 @@ function updateSimulation(data) {
     // Update warehouse
     if (data.warehouse) {
         updateWarehouse(data.warehouse);
+        
+        // Mark warehouse step as complete in the loading progress
+        if (typeof updateLoadingProgress === 'function') {
+            updateLoadingProgress('warehouseLoaded', 'Warehouse model loaded');
+        }
     }
     
     // Update robot
@@ -177,11 +192,21 @@ function updateSimulation(data) {
         if (data.robot.path) {
             updateRobotPath(data.robot.path);
         }
+        
+        // Mark robot step as complete in the loading progress
+        if (typeof updateLoadingProgress === 'function') {
+            updateLoadingProgress('robotLoaded', 'Robot model loaded');
+        }
     }
     
     // Update tasks
     if (data.tasks) {
         updateTasks(data.tasks);
+    }
+    
+    // Mark simulation as ready in the loading progress
+    if (typeof updateLoadingProgress === 'function') {
+        updateLoadingProgress('simulationReady', 'Simulation ready');
     }
 }
 
@@ -220,20 +245,22 @@ function updateTaskVisuals(tasks) {
     const existingMarkers = scene.children.filter(obj => obj.name && obj.name.startsWith('task_marker_'));
     existingMarkers.forEach(marker => {
         scene.remove(marker);
+        if (marker.geometry) marker.geometry.dispose();
+        if (marker.material) marker.material.dispose();
     });
     
-    // Create new task markers
-    tasks.forEach((task, index) => {
-        // Skip completed tasks
-        if (task.completed) return;
-        
+    // Only create markers for active tasks (max 10 to avoid performance issues)
+    const activeTasks = tasks.filter(task => !task.completed).slice(0, 10);
+    
+    // Create task markers
+    activeTasks.forEach((task, index) => {
         // Create a marker based on task type
         let markerGeometry, markerMaterial;
         
         switch (task.type) {
             case 'pick':
-                // Create a ring for pick tasks
-                markerGeometry = new THREE.TorusGeometry(0.5, 0.1, 16, 32);
+                // Create a ring for pick tasks - reduced segments
+                markerGeometry = new THREE.TorusGeometry(0.5, 0.1, 8, 16); // Reduced from 16, 32
                 markerMaterial = new THREE.MeshBasicMaterial({ color: 0xe74c3c });
                 break;
                 
@@ -249,8 +276,8 @@ function updateTaskVisuals(tasks) {
                 break;
                 
             case 'charge':
-                // Create a lightning bolt shape for charge tasks
-                markerGeometry = new THREE.CircleGeometry(0.5, 32);
+                // Create a circle for charge tasks - reduced segments
+                markerGeometry = new THREE.CircleGeometry(0.5, 16); // Reduced from 32
                 markerMaterial = new THREE.MeshBasicMaterial({ 
                     color: 0xf39c12,
                     transparent: true,
@@ -260,7 +287,7 @@ function updateTaskVisuals(tasks) {
                 
             default:
                 // Default marker for other task types
-                markerGeometry = new THREE.CircleGeometry(0.3, 16);
+                markerGeometry = new THREE.CircleGeometry(0.3, 8); // Reduced from 16
                 markerMaterial = new THREE.MeshBasicMaterial({ color: 0x95a5a6 });
         }
         
@@ -275,10 +302,10 @@ function updateTaskVisuals(tasks) {
         }
         
         marker.name = `task_marker_${index}`;
+        // Don't cast or receive shadows for better performance
+        marker.castShadow = false;
+        marker.receiveShadow = false;
         scene.add(marker);
-        
-        // Add a pulsing animation for the marker
-        // This would be handled in the animation loop
     });
 }
 
