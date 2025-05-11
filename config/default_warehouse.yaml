@@ -1,0 +1,14 @@
+aisle_width: 2.0
+charging_stations: 2
+item_types: 10
+length: 30.0
+num_items: 100
+num_racks: 10
+obstacle_density: 0.05
+rack_length: 5.0
+rack_width: 1.0
+robot_start_position:
+- 1.0
+- 1.0
+task_generation_rate: 0.1
+width: 20.0

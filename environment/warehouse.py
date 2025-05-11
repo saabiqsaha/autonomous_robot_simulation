@@ -91,15 +91,18 @@ class Warehouse:
         # Generate the warehouse layout
         self.layout = config.generate_layout()
         
-        # Initialize warehouse components
-        self.obstacles = self._generate_obstacles()
-        self.items = self._generate_items()
-        self.racks = self._generate_racks()
-        self.charging_stations = self._generate_charging_stations()
-        
-        # Tasks
+        # Initialize empty containers first to avoid circular dependencies
+        self.obstacles = []
+        self.items = []
+        self.racks = []
         self.tasks = []
         self.completed_tasks = []
+        
+        # Now generate components using these initialized containers
+        self.racks = self._generate_racks()
+        self.obstacles = self._generate_obstacles()
+        self.items = self._generate_items()
+        self.charging_stations = self._generate_charging_stations()
         
         # Start position for the robot
         self.start_position = config.get("robot_start_position")
