@@ -1,1 +1,0 @@
-print("robot is ready")
