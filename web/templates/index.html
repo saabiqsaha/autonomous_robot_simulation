@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse Robot Simulation</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for camera manipulation -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <!-- Socket.IO for real-time communication -->
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Warehouse Robot Simulation</h1>
+            <div class="controls">
+                <button id="toggle-grid">Toggle Grid</button>
+                <button id="toggle-paths">Toggle Paths</button>
+                <button id="toggle-top-view">Top View</button>
+                <button id="toggle-follow-robot">Follow Robot</button>
+            </div>
+        </header>
+        
+        <div class="main-content">
+            <div id="simulation-container"></div>
+            
+            <div class="info-panel">
+                <div class="robot-info">
+                    <h2>Robot Status</h2>
+                    <div id="robot-status"></div>
+                    <div id="robot-battery">
+                        <div class="battery-label">Battery:</div>
+                        <div class="battery-bar">
+                            <div class="battery-level"></div>
+                        </div>
+                        <div class="battery-percentage">100%</div>
+                    </div>
+                    <div id="robot-position">Position: (0, 0)</div>
+                    <div id="robot-orientation">Orientation: 0°</div>
+                    <div id="robot-task">Current Task: None</div>
+                </div>
+                
+                <div class="task-info">
+                    <h2>Tasks</h2>
+                    <div id="task-list"></div>
+                </div>
+                
+                <div class="statistics">
+                    <h2>Statistics</h2>
+                    <div id="stats"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Custom JS files -->
+    <script src="/static/js/three-setup.js"></script>
+    <script src="/static/js/warehouse-model.js"></script>
+    <script src="/static/js/robot-model.js"></script>
+    <script src="/static/js/simulation.js"></script>
+</body>
+</html>

@@ -7,6 +7,7 @@ import sys
 import os
 import time
 import argparse
+import threading
 
 # Add the project directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -20,12 +21,15 @@ from planning.path_planner import PathPlanner
 from planning.task_scheduler import TaskScheduler
 from dashboard.dashboard import Dashboard
 from utils.visualization import Visualizer
+from web_server import start_web_server, update_simulation_state
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Autonomous Robot Simulation")
     parser.add_argument("--config", type=str, default="default", help="Configuration name")
     parser.add_argument("--headless", action="store_true", help="Run without visualization")
     parser.add_argument("--duration", type=int, default=300, help="Simulation duration in seconds")
+    parser.add_argument("--web", action="store_true", help="Enable web visualization")
+    parser.add_argument("--web-port", type=int, default=5000, help="Web server port")
     return parser.parse_args()
 
 def main():
@@ -57,11 +61,27 @@ def main():
             print(f"Warning: Could not initialize visualizer: {vis_err}")
             visualizer = None
             
+        # Start web server if requested
+        web_server_thread = None
+        if args.web:
+            print(f"Starting web visualization server on port {args.web_port}...")
+            web_server_thread = threading.Thread(
+                target=start_web_server,
+                kwargs={'debug': False, 'port': args.web_port}
+            )
+            web_server_thread.daemon = True
+            web_server_thread.start()
+            
+            # Give the web server a moment to start
+            time.sleep(1)
+            
         print(f"Starting simulation with config: {args.config}")
         
         # Main simulation loop
         start_time = time.time()
         sim_time = 0
+        update_interval = 0.1  # Update web UI every 100ms
+        last_web_update = 0
         
         try:
             while sim_time < args.duration:
@@ -92,6 +112,11 @@ def main():
                         print(f"Warning: Visualization error: {vis_err}")
                         visualizer = None
                 
+                # Update web visualization if enabled
+                if args.web and (time.time() - last_web_update) >= update_interval:
+                    update_simulation_state(robot, warehouse, scheduler)
+                    last_web_update = time.time()
+                
                 # Update simulation time
                 sim_time = time.time() - start_time
                 time.sleep(0.1)  # Simulation step
@@ -107,47 +132,6 @@ def main():
         import traceback
         print(f"Error during simulation: {e}")
         traceback.print_exc()
-    
-    print(f"Starting simulation with config: {args.config}")
-    
-    # Main simulation loop
-    start_time = time.time()
-    sim_time = 0
-    
-    try:
-        while sim_time < args.duration:
-            # Get current task
-            current_task = scheduler.get_next_task()
-            
-            if current_task:
-                # Plan path to target
-                target_position = current_task.get_position()
-                path = path_planner.plan_path(robot.position, target_position)
-                
-                # Execute path
-                robot.follow_path(path)
-                
-                # Complete task
-                robot.execute_task(current_task)
-                scheduler.mark_completed(current_task)
-            
-            # Update dashboard
-            dashboard.update(robot, warehouse, scheduler)
-            
-            # Visualize if needed
-            if visualizer:
-                visualizer.update()
-            
-            # Update simulation time
-            sim_time = time.time() - start_time
-            time.sleep(0.1)  # Simulation step
-    
-    except KeyboardInterrupt:
-        print("\nSimulation terminated by user")
-    
-    # Show final metrics
-    dashboard.show_final_metrics()
-    print(f"Simulation completed after {sim_time:.2f} seconds")
 
 if __name__ == "__main__":
     main()
